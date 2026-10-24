@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Calendar 2026-2027</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            overflow: hidden; 
+        }
+        
+        /* Premium aesthetics */
+        .header-gradient {
+            background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+        }
+        .modal-gradient {
+            background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+        }
+        
+        .day-cell {
+            height: 11vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+        .day-cell::-webkit-scrollbar {
+            width: 4px;
+        }
+        .day-cell::-webkit-scrollbar-thumb {
+            background-color: #94a3b8;
+            border-radius: 4px;
+        }
+        .event-badge {
+            font-size: 0.65rem;
+            line-height: 0.8rem;
+            padding: 0.2rem 0.3rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.2rem;
+            white-space: normal;
+            word-break: break-word;
+            display: block;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border-left-width: 3px;
+        }
+        .event-detail {
+            display: block;
+            font-size: 0.55rem;
+            font-style: italic;
+            opacity: 0.85;
+            margin-top: 1px;
+        }
+        
+        /* Non-working days styling (White background with thick slate border) */
+        .non-working-day {
+            background-color: #ffffff !important;
+            color: #1f2937 !important;
+            border: 3px solid #64748b !important;
+        }
+        .non-working-day:hover {
+            border-color: #475569 !important;
+            background-color: #f8fafc !important;
+        }
+
+        /* Working days styling (White background with a bright blue border) */
+        .working-day {
+            background-color: #ffffff !important;
+            color: #1f2937 !important;
+            border: 2px solid #38bdf8 !important;
+        }
+        .working-day:hover {
+            border-color: #0284c7 !important;
+            background-color: #f0f9ff !important;
+        }
+
+        @media (max-width: 768px) {
+            .day-cell {
+                height: 9vh;
+            }
+            .event-badge {
+                font-size: 0.55rem;
+                line-height: 0.7rem;
+                padding: 0.15rem;
+            }
+        }
+        
+        /* Advanced Print Handling */
+        @media print {
+            body { 
+                background: white !important; 
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                overflow: visible !important;
+                height: auto;
+            }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            
+            /* Print mode modifiers set via JS */
+            body.print-main #halfTermModal, body.print-main #fullYearModal { display: none !important; }
+            
+            body.print-modal > div:first-of-type { display: none !important; }
+            
+            body.print-modal .modal-container { 
+                display: block !important; 
+                position: static !important; 
+                background: white !important; 
+                padding: 0;
+            }
+            body.print-modal .modal-content { 
+                box-shadow: none; 
+                max-width: 100%; 
+                max-height: none; 
+                border: none;
+            }
+            
+            .day-cell { height: auto !important; min-height: 80px; overflow: hidden; page-break-inside: avoid; }
+            .header-gradient, .modal-gradient { background: white !important; color: black !important; border-bottom: 2px solid black; }
+        }
+        
+        /* Page Turning Animations (Subtle Slide & Fade) */
+        .page-flip-next-out { animation: fadeNextOut 0.2s forwards ease-in-out; }
+        .page-flip-next-in { animation: fadeNextIn 0.25s forwards ease-out; }
+        .page-flip-prev-out { animation: fadePrevOut 0.2s forwards ease-in-out; }
+        .page-flip-prev-in { animation: fadePrevIn 0.25s forwards ease-out; }
+
+        @keyframes fadeNextOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(-15px); opacity: 0; }
+        }
+        @keyframes fadeNextIn {
+            from { transform: translateX(15px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadePrevOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(15px); opacity: 0; }
+        }
+        @keyframes fadePrevIn {
+            from { transform: translateX(-15px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Very slow, subtle red pulse animation for active To-Do items */
+        @keyframes subtleRedPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); background-color: #dc2626; }
+        }
+        .todo-flash {
+            animation: subtleRedPulse 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="p-1 md:p-2 text-gray-800 h-screen flex flex-col">
+
+    <!-- Top Tools / Toast Notification -->
+    <div id="toastBox" class="fixed top-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-[100]">
+        Message
+    </div>
+
+    <!-- Main App Container -->
+    <div class="max-w-7xl mx-auto w-full bg-white rounded-xl shadow-xl overflow-hidden flex flex-col h-full ring-1 ring-gray-900/5">
+        
+        <!-- Premium Header -->
+        <div class="flex flex-col md:flex-row items-center justify-between px-5 py-3 header-gradient text-white border-b shrink-0 no-print">
+            <div class="w-full md:w-1/3 mb-2 md:mb-0 text-center md:text-left">
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight shadow-sm">School Calendar</h1>
+                <p class="text-xs text-blue-200 font-medium tracking-wide mb-1">Made by Mr A Reeve</p>
+                <div class="flex items-center justify-center md:justify-start space-x-2">
+                    <span class="bg-orange-500 px-2 py-0.5 rounded text-[0.65rem] font-bold text-white shadow-md border border-orange-400"><span id="gcseCountdown"></span> to GCSEs</span>
+                    <span class="bg-orange-500 px-2 py-0.5 rounded text-[0.65rem] font-bold text-white shadow-md border border-orange-400"><span id="alevelCountdown"></span> to A-Levels</span>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto">
+                <button id="todoBtn" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-semibold rounded shadow transition flex items-center">
+                    To Do Now <span id="todoBadge" class="ml-1.5 px-1.5 py-0.2 bg-white/20 rounded-full text-[0.6rem] hidden">0</span>
+                </button>
+                <button id="halfTermBtn" class="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-white text-xs font-semibold rounded shadow transition flex items-center">
+                    Half Term
+                </button>
+                <button id="fullYearBtn" class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold rounded shadow transition flex items-center">
+                    Full Year
+                </button>
+                <div class="w-px h-6 bg-white/20 mx-1 hidden md:block"></div>
+                <button id="saveBtn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded shadow transition flex items-center" title="Save to File">
+                    Save
+                </button>
+                <button id="uploadBtn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded shadow transition flex items-center" title="Upload from File">
+                    Upload
+                </button>
+                <input type="file" id="fileInput" class="hidden" accept=".json">
+                <button id="printMainBtn" class="px-3 py-1.5 bg-white text-blue-900 hover:bg-gray-100 text-xs font-bold rounded shadow transition flex items-center">
+                    Print
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-2 mt-2 md:mt-0 w-full md:w-1/3 justify-center md:justify-end">
+                <button id="prevBtn" class="px-2 py-1 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50 disabled:cursor-not-allowed transition text-sm backdrop-blur-sm">
+                    &larr; Prev
+                </button>
+                <h2 id="monthYearDisplay" class="text-base md:text-lg font-bold w-36 text-center tracking-wide">
+                    November 2026
+                </h2>
+                <button id="nextBtn" class="px-2 py-1 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50 disabled:cursor-not-allowed transition text-sm backdrop-blur-sm">
+                    Next &rarr;
+                </button>
+            </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="p-1 md:p-2 flex-1 flex flex-col bg-gray-50">
+            <!-- Days of Week Header -->
+            <div class="grid grid-cols-7 gap-px mb-1 shrink-0 bg-transparent">
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Sat</div>
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Sun</div>
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Mon</div>
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Tue</div>
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Wed</div>
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Thu</div>
+                <div class="text-center text-xs font-bold text-gray-500 py-1 uppercase tracking-wider">Fri</div>
+            </div>
+            <!-- Grid -->
+            <div id="calendarGrid" class="grid grid-cols-7 gap-1 flex-1">
+                <!-- Cells will be generated here by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="px-2 py-2 bg-white border-t flex flex-wrap gap-3 text-xs justify-center shrink-0 font-medium text-gray-600 no-print shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-green-400 mr-1.5 shadow-sm"></span>Term</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-600 mr-1.5 shadow-sm"></span>Important Exam</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-300 mr-1.5 shadow-sm"></span>Exam</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-purple-400 mr-1.5 shadow-sm"></span>Report</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-400 mr-1.5 shadow-sm"></span>Parents Eve</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-yellow-400 mr-1.5 shadow-sm"></span>Event</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-indigo-400 mr-1.5 shadow-sm"></span>Trip</div>
+            <div class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-blue-700 mr-1.5 shadow-sm"></span>ITFC</div>
+        </div>
+    </div>
+
+    <!-- Half Term Modal -->
+    <div id="halfTermModal" class="modal-container fixed inset-0 bg-slate-900/60 hidden z-50 flex justify-center items-center p-2 md:p-4 backdrop-blur-sm transition-opacity">
+        <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden ring-1 ring-black/5">
+            <div class="flex justify-between items-center p-4 header-gradient text-white shrink-0">
+                <h3 id="halfTermTitle" class="text-xl font-bold tracking-tight">Half Term at a Glance</h3>
+                <div class="flex items-center no-print">
+                    <button id="printHalfTermBtn" class="bg-white text-blue-900 px-4 py-1.5 rounded text-sm font-bold mr-4 hover:bg-gray-100 transition shadow-sm">Print</button>
+                    <button id="closeModalBtn" class="text-white/80 hover:text-white text-3xl leading-none transition align-middle">&times;</button>
+                </div>
+            </div>
+            <div class="p-2 md:p-4 overflow-y-auto flex-1 bg-gray-50 flex flex-col" id="halfTermScrollArea">
+                <div id="halfTermContent" class="flex-1 flex flex-col bg-white rounded-lg shadow-sm ring-1 ring-gray-200 p-1">
+                    <!-- Content populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Year Modal -->
+    <div id="fullYearModal" class="modal-container fixed inset-0 bg-slate-900/60 hidden z-[55] flex justify-center items-center p-2 md:p-4 backdrop-blur-sm transition-opacity">
+        <div class="modal-content bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden ring-1 ring-black/5">
+            <div class="flex justify-between items-center p-4 header-gradient text-white shrink-0">
+                <h3 class="text-xl font-bold tracking-tight">Full Year at a Glance (2026 - 2027)</h3>
+                <div class="flex items-center no-print">
+                    <button id="printFullYearBtn" class="bg-white text-blue-900 px-4 py-1.5 rounded text-sm font-bold mr-4 hover:bg-gray-100 transition shadow-sm">Print</button>
+                    <button id="closeFullYearBtn" class="text-white/80 hover:text-white text-3xl leading-none transition align-middle">&times;</button>
+                </div>
+            </div>
+            <div class="p-2 md:p-4 overflow-y-auto flex-1 bg-gray-50" id="fullYearScrollArea">
+                <div id="fullYearContent" class="flex flex-col gap-6">
+                    <!-- Content populated by JS (List of grids) -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- To Do Modal -->
+    <div id="todoModal" class="modal-container fixed inset-0 bg-slate-900/60 hidden z-[70] flex justify-center items-center p-4 backdrop-blur-sm no-print">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden ring-1 ring-black/5">
+            <div class="p-4 modal-gradient text-white flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-base tracking-wide">To Do Now</h3>
+                <button id="closeTodoModalBtn" class="text-white/80 hover:text-white text-2xl leading-none transition">&times;</button>
+            </div>
+            <div class="p-4 max-h-64 overflow-y-auto bg-gray-50" id="todoListArea">
+                <!-- Populated by JS -->
+            </div>
+            <div class="p-4 bg-white border-t flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <input type="text" id="newTaskInput" placeholder="Add a new quick task..." class="flex-1 border border-gray-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition">
+                    <button id="addTaskBtn" class="bg-teal-600 hover:bg-teal-500 text-white font-bold px-4 py-2 rounded text-sm transition shadow-sm">Add</button>
+                </div>
+                <div id="carryOverPrompt" class="hidden bg-amber-50 border border-amber-200 text-amber-800 p-2 rounded text-xs flex justify-between items-center mt-1">
+                    <span>Carry over uncompleted tasks from last month?</span>
+                    <button id="carryOverBtn" class="bg-amber-600 hover:bg-amber-500 text-white px-2 py-1 rounded font-bold">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Day Modal -->
+    <div id="editDayModal" class="fixed inset-0 bg-slate-900/60 hidden z-[60] flex justify-center items-center p-4 backdrop-blur-sm no-print">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden ring-1 ring-black/5">
+            <div class="p-4 modal-gradient text-white flex justify-between items-center shrink-0">
+                <h3 id="editDayTitle" class="font-bold text-base tracking-wide">Edit Events</h3>
+                <button id="closeEditModalBtn" class="text-white/80 hover:text-white text-2xl leading-none transition">&times;</button>
+            </div>
+            <div class="p-4 max-h-64 overflow-y-auto bg-gray-50" id="editDayEventsList">
+                <!-- Populated by JS -->
+            </div>
+            <div class="p-4 bg-white border-t flex flex-col gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Event Title</label>
+                    <input type="text" id="newEventTitle" placeholder="e.g., Parent Council Meeting" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Extra Detail (Optional)</label>
+                    <input type="text" id="newEventDetail" placeholder="e.g., Flight Out 14:00, Return 21:00" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Category</label>
+                    <select id="newEventType" class="w-full border border-gray-300 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition bg-white">
+                        <option value="event">Event</option>
+                        <option value="term">Term</option>
+                        <option value="exam">Exam</option>
+                        <option value="important-exam">Important Exam</option>
+                        <option value="report">Report</option>
+                        <option value="parents">Parents Eve</option>
+                        <option value="trip">Trip</option>
+                        <option value="itfc">ITFC Match</option>
+                        <option value="pd">PD Day</option>
+                    </select>
+                </div>
+                <button id="addEventBtn" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 rounded text-sm transition shadow-sm mt-1">Add to Calendar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Calendar Configuration
+        const startYear = 2026;
+        const startMonth = 10; // 0-indexed (November)
+        const endYear = 2027;
+        const endMonth = 6; // 0-indexed (July)
+
+        let currentYear = startYear;
+        let currentMonth = startMonth;
+
+        // Dynamic Banner Colors per Month
+        const monthGradients = {
+            0: 'linear-gradient(135deg, #0369a1 0%, #0c4a6e 100%)',   // Jan: Icy Blue
+            1: 'linear-gradient(135deg, #9d174d 0%, #831843 100%)',   // Feb: Deep Pink
+            2: 'linear-gradient(135deg, #15803d 0%, #14532d 100%)',   // Mar: Spring Green
+            3: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)',   // Apr: Purple
+            4: 'linear-gradient(135deg, #b45309 0%, #78350f 100%)',   // May: Amber
+            5: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)',   // Jun: Bright Blue
+            6: 'linear-gradient(135deg, #c2410c 0%, #7c2d12 100%)',   // Jul: Burnt Orange
+            7: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',   // Aug: Yellow/Gold
+            8: 'linear-gradient(135deg, #4f46e5 0%, #312e81 100%)',   // Sep: Indigo
+            9: 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',   // Oct: Red
+            10: 'linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)',  // Nov: Navy
+            11: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)'   // Dec: Festive Teal
+        };
+
+        // Raw Event Data based on School Calendar + custom Turing trip + exact GCSE/A-Level Science Papers
+        const rawEvents = [
+            // --- EXACT GCSE COMBINED SCIENCE (TRILOGY) 2027 ---
+            { start: '2027-05-11', end: '2027-05-11', title: 'AQA GCSE Biology 1', detail: 'AM', type: 'important-exam' },
+            { start: '2027-05-17', end: '2027-05-17', title: 'AQA GCSE Chemistry 1', detail: 'AM', type: 'important-exam' },
+            { start: '2027-05-25', end: '2027-05-25', title: 'AQA GCSE Physics 1', detail: 'AM', type: 'important-exam' },
+            { start: '2027-06-10', end: '2027-06-10', title: 'AQA GCSE Biology 2', detail: 'AM', type: 'important-exam' },
+            { start: '2027-06-15', end: '2027-06-15', title: 'AQA GCSE Chemistry 2', detail: 'AM', type: 'important-exam' },
+            { start: '2027-06-18', end: '2027-06-18', title: 'AQA GCSE Physics 2', detail: 'AM', type: 'important-exam' },
+
+            // --- EXACT OCR A-LEVEL BIOLOGY PAPERS 2027 ---
+            { start: '2027-06-07', end: '2027-06-07', title: 'OCR A-Level Biology Paper 1', detail: 'PM', type: 'important-exam' },
+            { start: '2027-06-14', end: '2027-06-14', title: 'OCR A-Level Biology Paper 2', detail: 'PM', type: 'important-exam' },
+            { start: '2027-06-18', end: '2027-06-18', title: 'OCR A-Level Biology Paper 3', detail: 'AM', type: 'important-exam' },
+
+            // --- NOVEMBER 2026 ---
+            { start: '2026-11-02', end: '2026-11-06', title: 'Y13 Mocks', type: 'exam' },
+            { start: '2026-11-12', end: '2026-11-12', title: 'Y11 Reports Released', type: 'report' },
+            { start: '2026-11-14', end: '2026-11-14', title: '6th Form Open Saturday', type: 'event' },
+            { start: '2026-11-16', end: '2026-11-27', title: 'Y10 Assessments', type: 'exam' },
+            { start: '2026-11-19', end: '2026-11-19', title: 'Y11 Parents Eve', type: 'parents' },
+            { start: '2026-11-23', end: '2026-11-23', title: 'Past Y11 Presentation Eve', type: 'event' },
+            { start: '2026-11-26', end: '2026-11-26', title: 'Y13 Reports Released', type: 'report' },
+            { start: '2026-11-26', end: '2026-11-26', title: 'Yr 6/7 Carol Concert', type: 'event' },
+            { start: '2026-11-27', end: '2026-11-27', title: 'PD Day', type: 'pd' },
+
+            // --- DECEMBER 2026 ---
+            { start: '2026-12-03', end: '2026-12-03', title: 'Y13 Parents Eve', type: 'parents' },
+            { start: '2026-12-07', end: '2026-12-18', title: 'Y7 Assessments', type: 'exam' },
+            { start: '2026-12-07', end: '2026-12-07', title: 'Copleston Carol Service', type: 'event' },
+            { start: '2026-12-11', end: '2026-12-11', title: 'Y7 Christmas Fayre', type: 'event' },
+            { start: '2026-12-17', end: '2026-12-17', title: 'Y10 Reports Released', type: 'report' },
+            { start: '2026-12-18', end: '2026-12-18', title: 'End of Autumn Term (Half Day)', type: 'term' },
+            
+            // --- JANUARY 2027 ---
+            { start: '2027-01-04', end: '2027-01-04', title: 'PD Day', type: 'pd' },
+            { start: '2027-01-05', end: '2027-01-15', title: 'Y8 Assessments / Y12 Mocks', type: 'exam' },
+            { start: '2027-01-13', end: '2027-01-13', title: 'DofE Celeb Eve', type: 'event' },
+            { start: '2027-01-21', end: '2027-01-21', title: 'Y7 Reports Released', type: 'report' },
+            { start: '2027-01-25', end: '2027-02-05', title: 'Y11 Mocks', type: 'exam' },
+            { start: '2027-01-26', end: '2027-01-26', title: '6th Form Interviews', type: 'event' },
+            { start: '2027-01-28', end: '2027-01-28', title: 'Y12 Reports Released', type: 'report' },
+            { start: '2027-01-30', end: '2027-01-30', title: '6th Form Open Saturday', type: 'event' },
+
+            // --- FEBRUARY 2027 ---
+            { start: '2027-02-02', end: '2027-02-04', title: 'School Prod: Matilda JR', type: 'event' },
+            { start: '2027-02-04', end: '2027-02-04', title: 'Y12 Parents Eve / Y8 Reports', type: 'parents' },
+            { start: '2027-02-11', end: '2027-02-11', title: 'Y8 Parents Eve', type: 'parents' },
+            { start: '2027-02-15', end: '2027-02-19', title: 'Half Term', type: 'term' },
+            { start: '2027-02-22', end: '2027-02-26', title: 'Y13 Mocks', type: 'exam' },
+            { start: '2027-02-25', end: '2027-02-25', title: 'Young Musician Final', type: 'event' },
+
+            // --- MARCH 2027 ---
+            { start: '2027-03-01', end: '2027-03-12', title: 'Y9 Assessments', type: 'exam' },
+            { start: '2027-03-04', end: '2027-03-04', title: 'Y7 Parents Eve / Y11 Reports', type: 'parents' },
+            { start: '2027-03-10', end: '2027-03-10', title: 'Y8 Pathways Eve', type: 'parents' },
+            { start: '2027-03-15', end: '2027-03-26', title: 'Y11 Walk Through Mocks', type: 'exam' },
+            { start: '2027-03-16', end: '2027-03-16', title: 'Y11 Raising Achievement', type: 'parents' },
+            { start: '2027-03-18', end: '2027-03-18', title: 'Y13 Reports Released', type: 'report' },
+            { start: '2027-03-23', end: '2027-03-23', title: 'Y13 Concerns Eve', type: 'parents' },
+            { start: '2027-03-25', end: '2027-03-25', title: 'Spring Concert', type: 'event' },
+            { start: '2027-03-26', end: '2027-04-09', title: 'Easter Holidays', type: 'term' },
+
+            // --- APRIL 2027 ---
+            { start: '2027-04-12', end: '2027-04-23', title: 'Y10 Assessments', type: 'exam' },
+            { start: '2027-04-15', end: '2027-04-15', title: 'Y9 Reports Released', type: 'report' },
+            { start: '2027-04-21', end: '2027-04-21', title: 'Y11 Celebration Eve', type: 'event' },
+            { start: '2027-04-22', end: '2027-04-22', title: 'Y9 Parents Eve', type: 'parents' },
+
+            // --- MAY 2027 ---
+            { start: '2027-05-03', end: '2027-05-03', title: 'Bank Holiday', type: 'term' },
+            { start: '2027-05-05', end: '2027-05-05', title: 'Strictly Copleston', type: 'event' },
+            { start: '2027-05-27', end: '2027-05-27', title: 'Y10 Reports Released', type: 'report' },
+            { start: '2027-05-28', end: '2027-05-28', title: 'Y13 Leavers Day', type: 'event' },
+            { start: '2027-05-31', end: '2027-06-04', title: 'Half Term', type: 'term' },
+
+            // --- JUNE 2027 ---
+            { start: '2027-06-07', end: '2027-06-18', title: 'Y7 & Y8 Assessments', type: 'exam' },
+            { start: '2027-06-09', end: '2027-06-09', title: 'Y12 Next Steps Eve', type: 'parents' },
+            { start: '2027-06-10', end: '2027-06-10', title: 'Y10 Parents Eve', type: 'parents' },
+            { start: '2027-06-11', end: '2027-06-11', title: 'Y11 Leavers Day', type: 'event' },
+            { start: '2027-06-14', end: '2027-06-25', title: 'Y9 & Y12 Assessments', type: 'exam' },
+            { start: '2027-06-21', end: '2027-06-25', title: 'Y10 Work Experience', type: 'event' },
+            { start: '2027-06-23', end: '2027-06-24', title: 'Y6 Induction Days', type: 'event' },
+            { start: '2027-06-24', end: '2027-06-24', title: 'Y6 Parents Eve', type: 'parents' },
+            { start: '2027-06-25', end: '2027-06-25', title: 'Sports Day / Y11 Prom', type: 'event' },
+            { start: '2027-06-28', end: '2027-06-28', title: 'Y10 Celeb Eve', type: 'event' },
+            { start: '2027-06-29', end: '2027-06-29', title: 'Y9 Celeb Eve', type: 'event' },
+            { start: '2027-06-30', end: '2027-06-30', title: '6th Form Induction / Y8 Celeb', type: 'event' },
+
+            // --- JULY 2027 ---
+            { start: '2027-07-01', end: '2027-07-01', title: 'Y7 Celeb Eve / Y7 Reports', type: 'event' },
+            { start: '2027-07-02', end: '2027-07-02', title: 'Y13 Prom', type: 'event' },
+            { start: '2027-07-06', end: '2027-07-08', title: 'Summer Dance Show', type: 'event' },
+            { start: '2027-07-08', end: '2027-07-08', title: 'Y8 Reports Released', type: 'report' },
+            { start: '2027-07-09', end: '2027-07-25', title: 'Turing Trip to Uganda', type: 'trip' },
+            { start: '2027-07-14', end: '2027-07-14', title: 'Musical Soiree', type: 'event' },
+            { start: '2027-07-15', end: '2027-07-15', title: 'Y9 & Y12 Reports Released', type: 'report' },
+            { start: '2027-07-20', end: '2027-07-20', title: 'End of Summer Term', type: 'term' },
+            { start: '2027-07-21', end: '2027-07-21', title: 'PD Day', type: 'pd' },
+
+            // --- ITFC FIXTURES 2026/2027 ---
+            { start: '2026-11-08', end: '2026-11-08', title: 'ITFC vs Bournemouth (H) 14:00', type: 'itfc' },
+            { start: '2026-11-21', end: '2026-11-21', title: 'ITFC @ Tottenham (A) 15:00', type: 'itfc' },
+            { start: '2026-11-28', end: '2026-11-28', title: 'ITFC vs Aston Villa (H) 17:30', type: 'itfc' },
+            { start: '2026-12-01', end: '2026-12-01', title: 'ITFC @ Coventry (A) 20:00', type: 'itfc' },
+            { start: '2026-12-05', end: '2026-12-05', title: 'ITFC @ Leeds (A) 15:00', type: 'itfc' },
+            { start: '2026-12-12', end: '2026-12-12', title: 'ITFC vs Newcastle (H) 15:00', type: 'itfc' },
+            { start: '2026-12-20', end: '2026-12-20', title: 'ITFC @ Brighton (A) 14:00', type: 'itfc' },
+            { start: '2026-12-26', end: '2026-12-26', title: 'ITFC vs Brentford (H) 15:00', type: 'itfc' },
+            { start: '2026-12-30', end: '2026-12-30', title: 'ITFC vs Chelsea (H) 20:15', type: 'itfc' },
+            { start: '2027-01-02', end: '2027-01-02', title: 'ITFC @ Arsenal (A) 15:00', type: 'itfc' },
+            { start: '2027-01-06', end: '2027-01-06', title: 'ITFC vs Coventry (H) 19:30', type: 'itfc' },
+            { start: '2027-01-16', end: '2027-01-16', title: 'ITFC @ Bournemouth (A) 15:00', type: 'itfc' },
+            { start: '2027-01-23', end: '2027-01-23', title: 'ITFC vs Hull City (H) 15:00', type: 'itfc' },
+            { start: '2027-01-30', end: '2027-01-30', title: 'ITFC @ Aston Villa (A) 15:00', type: 'itfc' },
+            { start: '2027-02-06', end: '2027-02-06', title: 'ITFC vs Tottenham (H) 15:00', type: 'itfc' },
+            { start: '2027-02-10', end: '2027-02-10', title: 'ITFC vs Arsenal (H) 20:00', type: 'itfc' },
+            { start: '2027-02-20', end: '2027-02-20', title: 'ITFC @ Chelsea (A) 15:00', type: 'itfc' },
+            { start: '2027-02-27', end: '2027-02-27', title: 'ITFC vs Brighton (H) 15:00', type: 'itfc' },
+            { start: '2027-03-03', end: '2027-03-03', title: 'ITFC @ Brentford (A) 20:00', type: 'itfc' },
+            { start: '2027-03-13', end: '2027-03-13', title: 'ITFC @ Liverpool (A) 15:00', type: 'itfc' },
+            { start: '2027-03-20', end: '2027-03-20', title: 'ITFC vs Crystal Palace (H) 15:00', type: 'itfc' },
+            { start: '2027-04-10', end: '2027-04-10', title: 'ITFC @ Sunderland (A) 15:00', type: 'itfc' },
+            { start: '2027-04-17', end: '2027-04-17', title: 'ITFC vs Man Utd (H) 15:00', type: 'itfc' },
+            { start: '2027-04-24', end: '2027-04-24', title: 'ITFC @ Newcastle (A) 15:00', type: 'itfc' },
+            { start: '2027-05-01', end: '2027-05-01', title: 'ITFC vs Leeds (H) 15:00', type: 'itfc' },
+            { start: '2027-05-08', end: '2027-05-08', title: 'ITFC @ Fulham (A) 15:00', type: 'itfc' },
+            { start: '2027-05-15', end: '2027-05-15', title: 'ITFC vs Man City (H) 15:00', type: 'itfc' },
+            { start: '2027-05-23', end: '2027-05-23', title: 'ITFC @ N. Forest (A) 15:00', type: 'itfc' },
+            { start: '2027-05-30', end: '2027-05-30', title: 'ITFC vs Everton (H) 16:00', type: 'itfc' }
+        ];
+
+        // Refined styling for badges
+        const typeColors = {
+            'term': 'bg-green-50 text-green-800 border-green-400',
+            'pd': 'bg-gray-100 text-gray-800 border-gray-400',
+            'exam': 'bg-red-50 text-red-800 border-red-400',
+            'important-exam': 'bg-red-600 text-white border-red-800 font-bold',
+            'report': 'bg-purple-50 text-purple-800 border-purple-400',
+            'parents': 'bg-blue-50 text-blue-800 border-blue-400',
+            'event': 'bg-yellow-50 text-yellow-800 border-yellow-400',
+            'trip': 'bg-indigo-50 text-indigo-800 border-indigo-400 font-semibold',
+            'itfc': 'bg-blue-700 text-white border-blue-400 font-semibold'
+        };
+
+        // UK Bank Holidays 26/27 range
+        const bankHolidays = [
+            '2026-12-25', '2026-12-28', '2027-01-01', 
+            '2027-03-26', '2027-03-29', '2027-05-03', '2027-05-31'
+        ];
+
+        // Holiday periods
+        const holidayRanges = [
+            {start: '2026-10-26', end: '2026-10-30'}, // Oct Half Term
+            {start: '2026-12-21', end: '2027-01-01'}, // Xmas Holidays
+            {start: '2027-02-15', end: '2027-02-19'}, // Feb Half Term
+            {start: '2027-03-26', end: '2027-04-09'}, // Easter
+            {start: '2027-05-31', end: '2027-06-04'}, // May Half term
+            {start: '2027-07-22', end: '2027-08-31'}  // Summer Holiday
+        ];
+
+        function isSchoolHoliday(dateStr) {
+            const d = new Date(dateStr);
+            for (let r of holidayRanges) {
+                if (d >= new Date(r.start) && d <= new Date(r.end)) return true;
+            }
+            return false;
+        }
+
+        // To-Do List State & Carry Over Management
+        let todoItems = [];
+        let previousMonthIncompleteTasks = [];
+
+        function updateTodoUI() {
+            const btn = document.getElementById('todoBtn');
+            const badge = document.getElementById('todoBadge');
+            const activeCount = todoItems.filter(t => !t.completed).length;
+
+            if (activeCount > 0) {
+                btn.classList.add('todo-flash');
+                badge.textContent = activeCount;
+                badge.classList.remove('hidden');
+            } else {
+                btn.classList.remove('todo-flash');
+                badge.classList.add('hidden');
+            }
+        }
+
+        function checkCarryOverTasks() {
+            const promptBox = document.getElementById('carryOverPrompt');
+            if (previousMonthIncompleteTasks.length > 0) {
+                promptBox.classList.remove('hidden');
+            } else {
+                promptBox.classList.add('hidden');
+            }
+        }
+
+        function renderTodoList() {
+            const container = document.getElementById('todoListArea');
+            container.innerHTML = '';
+
+            if (todoItems.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4">No tasks added yet.</p>';
+            } else {
+                todoItems.forEach((task, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'flex justify-between items-center bg-white p-2.5 border border-gray-200 rounded-lg mb-2 shadow-sm';
+
+                    const leftDiv = document.createElement('div');
+                    leftDiv.className = 'flex items-center space-x-2 flex-1 pr-2';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = task.completed;
+                    checkbox.className = 'w-4 h-4 text-teal-600 rounded focus:ring-teal-500 cursor-pointer';
+                    checkbox.onchange = () => {
+                        task.completed = checkbox.checked;
+                        updateTodoUI();
+                        renderTodoList();
+                    };
+
+                    const textSpan = document.createElement('span');
+                    textSpan.className = `text-sm flex-1 break-words ${task.completed ? 'line-through text-gray-400' : 'text-gray-700'}`;
+                    textSpan.textContent = task.text;
+
+                    leftDiv.appendChild(checkbox);
+                    leftDiv.appendChild(textSpan);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full w-7 h-7 flex items-center justify-center transition text-lg';
+                    delBtn.innerHTML = '&times;';
+                    delBtn.onclick = () => {
+                        todoItems.splice(index, 1);
+                        updateTodoUI();
+                        renderTodoList();
+                    };
+
+                    item.appendChild(leftDiv);
+                    item.appendChild(delBtn);
+                    container.appendChild(item);
+                });
+            }
+            checkCarryOverTasks();
+        }
+
+        // Process events into a daily lookup map
+        const eventMap = {};
+        
+        rawEvents.forEach(evt => {
+            let currDate = new Date(evt.start);
+            const endDate = new Date(evt.end);
+            
+            while(currDate <= endDate) {
+                const dateString = currDate.toLocaleDateString('en-CA'); 
+                const dayOfWeek = currDate.getDay();
+                
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isMonday = (dayOfWeek === 1);
+                const isBankHoliday = bankHolidays.includes(dateString);
+                const isHoliday = isSchoolHoliday(dateString);
+
+                // Skip standard events on weekends/holidays unless allowed types. Mondays can have events now.
+                if ((isWeekend || isBankHoliday || isHoliday) && !['itfc', 'trip', 'term', 'important-exam', 'exam'].includes(evt.type)) {
+                    // Skip
+                } else {
+                    if(!eventMap[dateString]) {
+                        eventMap[dateString] = [];
+                    }
+                    eventMap[dateString].push({
+                        ...evt,
+                        detail: evt.detail || ''
+                    });
+                }
+                
+                currDate.setDate(currDate.getDate() + 1);
+            }
+        });
+
+        // Smart sorting: Force Biology / Bio to absolute top, then other Important Exams
+        Object.keys(eventMap).forEach(date => {
+            eventMap[date].sort((a, b) => {
+                const aTitle = a.title.toLowerCase();
+                const bTitle = b.title.toLowerCase();
+                
+                const aIsBio = aTitle.includes('biology') || aTitle.includes('bio');
+                const bIsBio = bTitle.includes('biology') || bTitle.includes('bio');
+
+                if (aIsBio && !bIsBio) return -1;
+                if (bIsBio && !aIsBio) return 1;
+
+                if (a.type === 'important-exam' && b.type !== 'important-exam') return -1;
+                if (b.type === 'important-exam' && a.type !== 'important-exam') return 1;
+                return 0;
+            });
+        });
+
+        // DOM Elements
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const monthYearDisplay = document.getElementById('monthYearDisplay');
+        const calendarGrid = document.getElementById('calendarGrid');
+        const toastBox = document.getElementById('toastBox');
+
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        function showToast(msg) {
+            toastBox.textContent = msg;
+            toastBox.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toastBox.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        function renderCalendar(year, month) {
+            calendarGrid.innerHTML = '';
+            monthYearDisplay.textContent = `${monthNames[month]} ${year}`;
+
+            const activeGradient = monthGradients[month] || monthGradients[10];
+            document.querySelectorAll('.header-gradient').forEach(el => {
+                el.style.background = activeGradient;
+            });
+
+            prevBtn.disabled = (year === startYear && month === startMonth);
+            nextBtn.disabled = (year === endYear && month === endMonth);
+
+            const firstDay = new Date(year, month, 1).getDay(); 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const paddingDays = (firstDay + 1) % 7;
+
+            for (let i = 0; i < paddingDays; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'bg-transparent rounded-lg';
+                calendarGrid.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const cell = document.createElement('div');
+                
+                const dateObj = new Date(year, month, day);
+                const dateString = dateObj.toLocaleDateString('en-CA');
+                
+                const dayOfWeek = dateObj.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isMonday = (dayOfWeek === 1);
+                const isBankHoliday = bankHolidays.includes(dateString);
+                const isHoliday = isSchoolHoliday(dateString);
+
+                let baseClasses = 'rounded-lg p-1.5 md:p-2 day-cell overflow-hidden transition cursor-pointer relative shadow-sm hover:shadow-md ';
+                if (isWeekend || isMonday || isBankHoliday || isHoliday) {
+                    cell.className = baseClasses + 'non-working-day';
+                } else {
+                    cell.className = baseClasses + 'working-day';
+                }
+                
+                const dateNumber = document.createElement('div');
+                dateNumber.className = 'font-bold text-right text-xs mb-1 opacity-70';
+                dateNumber.textContent = day;
+                cell.appendChild(dateNumber);
+
+                if (eventMap[dateString]) {
+                    eventMap[dateString].forEach(evt => {
+                        const badge = document.createElement('span');
+                        badge.className = `event-badge border-l-4 ${typeColors[evt.type]}`;
+                        
+                        let badgeHtml = `<span>${evt.title}</span>`;
+                        if (evt.detail) {
+                            badgeHtml += `<span class="event-detail">${evt.detail}</span>`;
+                        }
+                        badge.innerHTML = badgeHtml;
+                        cell.appendChild(badge);
+                    });
+                }
+                
+                cell.addEventListener('click', () => openEditModal(dateString));
+                calendarGrid.appendChild(cell);
+            }
+        }
+
+        // Transition with Month change & Task rollover caching
+        let isAnimating = false;
+
+        function transitionMonth(direction) {
+            if (isAnimating) return;
+            if (direction === 'prev' && prevBtn.disabled) return;
+            if (direction === 'next' && nextBtn.disabled) return;
+
+            // Cache incomplete tasks as previous month rollover (without auto-prepopulating)
+            previousMonthIncompleteTasks = todoItems.filter(t => !t.completed).map(t => t.text);
+
+            isAnimating = true;
+            const grid = document.getElementById('calendarGrid');
+            
+            const outClass = direction === 'next' ? 'page-flip-next-out' : 'page-flip-prev-out';
+            const inClass = direction === 'next' ? 'page-flip-next-in' : 'page-flip-prev-in';
+            
+            grid.classList.add(outClass);
+            
+            setTimeout(() => {
+                if (direction === 'next') {
+                    if (currentMonth === 11) { currentMonth = 0; currentYear++; } else { currentMonth++; }
+                } else {
+                    if (currentMonth === 0) { currentMonth = 11; currentYear--; } else { currentMonth--; }
+                }
+                
+                renderCalendar(currentYear, currentMonth);
+                
+                grid.classList.remove(outClass);
+                grid.classList.add(inClass);
+                
+                setTimeout(() => {
+                    grid.classList.remove(inClass);
+                    isAnimating = false;
+                }, 250);
+            }, 250);
+        }
+
+        prevBtn.addEventListener('click', () => transitionMonth('prev'));
+        nextBtn.addEventListener('click', () => transitionMonth('next'));
+
+        // Swipe support
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        calendarGrid.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, {passive: true});
+
+        calendarGrid.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, {passive: true});
+
+        function handleSwipe() {
+            const minSwipeDistance = 50; 
+            if (touchEndX < touchStartX - minSwipeDistance) {
+                transitionMonth('next');
+            }
+            if (touchEndX > touchStartX + minSwipeDistance) {
+                transitionMonth('prev');
+            }
+        }
+
+        renderCalendar(currentYear, currentMonth);
+
+        // Countdowns to GCSE & A-Level Biology Exams
+        function updateCountdowns() {
+            const now = new Date();
+            const gcseDate = new Date('2027-05-11T00:00:00');
+            const alevelDate = new Date('2027-06-07T00:00:00');
+            
+            const daysToGcse = Math.ceil((gcseDate - now) / (1000 * 60 * 60 * 24));
+            const daysToALevel = Math.ceil((alevelDate - now) / (1000 * 60 * 60 * 24));
+            
+            const gcseEl = document.getElementById('gcseCountdown');
+            const alevelEl = document.getElementById('alevelCountdown');
+            
+            if (gcseEl) gcseEl.textContent = daysToGcse > 0 ? daysToGcse + " Days" : (daysToGcse === 0 ? "Today!" : "Ended");
+            if (alevelEl) alevelEl.textContent = daysToALevel > 0 ? daysToALevel + " Days" : (daysToALevel === 0 ? "Today!" : "Ended");
+        }
+        
+        updateCountdowns();
+        setInterval(updateCountdowns, 1000 * 60 * 60 * 12);
+
+        // Grid Generator for Modals
+        function createCalendarGridForRange(startStr, endStr, hideTitle = false) {
+            const startDt = new Date(startStr);
+            const endDt = new Date(endStr);
+            
+            const gridContainer = document.createElement('div');
+            gridContainer.className = "flex-1 flex flex-col bg-white rounded border border-gray-200";
+            
+            if (!hideTitle) {
+                const titleBar = document.createElement('div');
+                titleBar.className = "bg-gray-100 px-3 py-2 text-sm font-bold text-gray-700 border-b";
+                titleBar.textContent = `${startDt.toLocaleDateString('en-GB', {month:'short', year:'numeric'})} - ${endDt.toLocaleDateString('en-GB', {month:'short', year:'numeric'})}`;
+                gridContainer.appendChild(titleBar);
+            }
+
+            const headerRow = document.createElement('div');
+            headerRow.className = "grid grid-cols-7 gap-px mb-px shrink-0 bg-gray-200 border-b";
+            const dayNames = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+            dayNames.forEach(d => {
+                const dh = document.createElement('div');
+                dh.className = "text-center text-xs font-bold text-gray-500 py-1.5 uppercase tracking-wider bg-white";
+                dh.textContent = d;
+                headerRow.appendChild(dh);
+            });
+            gridContainer.appendChild(headerRow);
+            
+            const grid = document.createElement('div');
+            grid.className = "grid grid-cols-7 gap-px bg-gray-200 flex-1";
+            
+            const padStart = (startDt.getDay() + 1) % 7;
+            for(let i=0; i < padStart; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'bg-gray-50';
+                grid.appendChild(emptyCell);
+            }
+            
+            let currDt = new Date(startDt);
+            while(currDt <= endDt) {
+                const dateString = currDt.toLocaleDateString('en-CA');
+                const dayOfWeek = currDt.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isMonday = (dayOfWeek === 1);
+                const isBankHoliday = bankHolidays.includes(dateString);
+                const isHoliday = isSchoolHoliday(dateString);
+                
+                const cell = document.createElement('div');
+                let baseClasses = 'p-1.5 day-cell overflow-hidden relative cursor-pointer min-h-[80px] transition ';
+                if (isWeekend || isMonday || isBankHoliday || isHoliday) {
+                    cell.className = baseClasses + 'non-working-day';
+                } else {
+                    cell.className = baseClasses + 'working-day';
+                }
+                
+                const dateNumber = document.createElement('div');
+                dateNumber.className = 'font-bold text-xs mb-1 opacity-70 text-right';
+                dateNumber.textContent = currDt.getDate() + ' ' + currDt.toLocaleString('en', {month:'short'});
+                cell.appendChild(dateNumber);
+                
+                if (eventMap[dateString]) {
+                    eventMap[dateString].forEach(evt => {
+                        const badge = document.createElement('span');
+                        badge.className = `event-badge border-l-4 ${typeColors[evt.type]}`;
+                        let badgeHtml = `<span>${evt.title}</span>`;
+                        if (evt.detail) {
+                            badgeHtml += `<span class="event-detail">${evt.detail}</span>`;
+                        }
+                        badge.innerHTML = badgeHtml;
+                        cell.appendChild(badge);
+                    });
+                }
+                
+                cell.addEventListener('click', () => openEditModal(dateString));
+                grid.appendChild(cell);
+                
+                currDt.setDate(currDt.getDate() + 1);
+            }
+            
+            gridContainer.appendChild(grid);
+            return gridContainer;
+        }
+
+        // Half Term Logic
+        const halfTerms = [
+            { name: "Autumn Term 2", start: '2026-11-02', end: '2026-12-18', months: [10, 11] },
+            { name: "Spring Term 1", start: '2027-01-04', end: '2027-02-12', months: [0] },
+            { name: "Spring Term 2", start: '2027-02-22', end: '2027-03-25', months: [1, 2] },
+            { name: "Summer Term 1", start: '2027-04-12', end: '2027-05-28', months: [3, 4] },
+            { name: "Summer Term 2", start: '2027-06-07', end: '2027-07-20', months: [5, 6] }
+        ];
+
+        function openHalfTermModal() {
+            const activeHalfTerm = halfTerms.find(ht => ht.months.includes(currentMonth));
+            const content = document.getElementById('halfTermContent');
+            const title = document.getElementById('halfTermTitle');
+            content.innerHTML = '';
+
+            if (!activeHalfTerm) {
+                title.textContent = "No Data";
+                content.innerHTML = "<p class='p-4 text-gray-600 font-medium'>No half term data available for this month.</p>";
+            } else {
+                title.textContent = activeHalfTerm.name + " - At a Glance";
+                content.appendChild(createCalendarGridForRange(activeHalfTerm.start, activeHalfTerm.end, true));
+            }
+            document.getElementById('halfTermModal').classList.remove('hidden');
+        }
+
+        function openFullYearModal() {
+            const content = document.getElementById('fullYearContent');
+            content.innerHTML = '';
+            
+            halfTerms.forEach(ht => {
+                const wrapper = document.createElement('div');
+                wrapper.className = "mb-4";
+                
+                const title = document.createElement('h4');
+                title.className = "text-lg font-bold text-gray-800 mb-2 pl-1 border-l-4 border-indigo-500";
+                title.textContent = ht.name;
+                
+                wrapper.appendChild(title);
+                wrapper.appendChild(createCalendarGridForRange(ht.start, ht.end, true));
+                content.appendChild(wrapper);
+            });
+
+            document.getElementById('fullYearModal').classList.remove('hidden');
+        }
+
+        // Print handlers
+        document.getElementById('printMainBtn').addEventListener('click', () => {
+            document.body.classList.add('print-main');
+            window.print();
+            document.body.classList.remove('print-main');
+        });
+        
+        document.getElementById('printHalfTermBtn').addEventListener('click', () => {
+            document.body.classList.add('print-modal');
+            window.print();
+            document.body.classList.remove('print-modal');
+        });
+
+        document.getElementById('printFullYearBtn').addEventListener('click', () => {
+            document.body.classList.add('print-modal');
+            window.print();
+            document.body.classList.remove('print-modal');
+        });
+
+        // Save & Load
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            const saveData = {
+                events: eventMap,
+                todos: todoItems
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(saveData));
+            const dlNode = document.createElement('a');
+            dlNode.setAttribute("href", dataStr);
+            dlNode.setAttribute("download", "calendar_backup_26-27.json");
+            document.body.appendChild(dlNode);
+            dlNode.click();
+            dlNode.remove();
+            showToast("Calendar saved successfully!");
+        });
+
+        document.getElementById('uploadBtn').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    if (parsed.events) {
+                        Object.keys(eventMap).forEach(k => delete eventMap[k]);
+                        Object.assign(eventMap, parsed.events);
+                        todoItems = parsed.todos || [];
+                    } else {
+                        Object.keys(eventMap).forEach(k => delete eventMap[k]);
+                        Object.assign(eventMap, parsed);
+                    }
+                    
+                    renderCalendar(currentYear, currentMonth);
+                    updateTodoUI();
+                    if (!document.getElementById('halfTermModal').classList.contains('hidden')) openHalfTermModal();
+                    if (!document.getElementById('fullYearModal').classList.contains('hidden')) openFullYearModal();
+                    
+                    showToast("Calendar loaded!");
+                } catch (err) {
+                    showToast("Error loading file.");
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+        });
+
+        // To-Do Modal Events
+        document.getElementById('todoBtn').addEventListener('click', () => {
+            renderTodoList();
+            document.getElementById('todoModal').classList.remove('hidden');
+        });
+        document.getElementById('closeTodoModalBtn').addEventListener('click', () => {
+            document.getElementById('todoModal').classList.add('hidden');
+        });
+        document.getElementById('addTaskBtn').addEventListener('click', () => {
+            const input = document.getElementById('newTaskInput');
+            const val = input.value.trim();
+            if(!val) return;
+            todoItems.push({ text: val, completed: false });
+            input.value = '';
+            updateTodoUI();
+            renderTodoList();
+        });
+        document.getElementById('carryOverBtn').addEventListener('click', () => {
+            previousMonthIncompleteTasks.forEach(taskText => {
+                if(!todoItems.some(t => t.text === taskText)) {
+                    todoItems.push({ text: taskText, completed: false });
+                }
+            });
+            previousMonthIncompleteTasks = [];
+            updateTodoUI();
+            renderTodoList();
+            showToast("Uncompleted tasks imported!");
+        });
+
+        // Modals Toggle
+        document.getElementById('halfTermBtn').addEventListener('click', openHalfTermModal);
+        document.getElementById('fullYearBtn').addEventListener('click', openFullYearModal);
+        
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            document.getElementById('halfTermModal').classList.add('hidden');
+        });
+        document.getElementById('closeFullYearBtn').addEventListener('click', () => {
+            document.getElementById('fullYearModal').classList.add('hidden');
+        });
+
+        document.querySelectorAll('.modal-container').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.add('hidden');
+            });
+        });
+
+        // Edit Day Logic
+        let editingDate = null;
+        let editingEventIndex = -1;
+        const editDayModal = document.getElementById('editDayModal');
+        const editDayTitle = document.getElementById('editDayTitle');
+        const editDayEventsList = document.getElementById('editDayEventsList');
+        const newEventTitleInput = document.getElementById('newEventTitle');
+        const newEventDetailInput = document.getElementById('newEventDetail');
+        const newEventTypeSelect = document.getElementById('newEventType');
+
+        function openEditModal(dateString) {
+            editingDate = dateString;
+            editingEventIndex = -1;
+            document.getElementById('addEventBtn').textContent = 'Add to Calendar';
+            
+            const dateObj = new Date(dateString);
+            editDayTitle.textContent = dateObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+            
+            renderEditList();
+            
+            newEventTitleInput.value = '';
+            newEventDetailInput.value = '';
+            newEventTypeSelect.value = 'event';
+            editDayModal.classList.remove('hidden');
+        }
+
+        function renderEditList() {
+            editDayEventsList.innerHTML = '';
+            const events = eventMap[editingDate] || [];
+            
+            if (events.length === 0) {
+                editDayEventsList.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4">No events scheduled.</p>';
+                return;
+            }
+
+            events.forEach((evt, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-start bg-white p-3 border border-gray-200 rounded-lg mb-2 shadow-sm';
+                
+                const textContainer = document.createElement('div');
+                textContainer.className = 'flex-1 break-words pr-2';
+                
+                const titleSpan = document.createElement('div');
+                titleSpan.className = `text-xs px-2 py-1 rounded font-bold border-l-4 ${typeColors[evt.type]} inline-block mb-1`;
+                titleSpan.textContent = evt.title;
+                textContainer.appendChild(titleSpan);
+                
+                if (evt.detail) {
+                    const detailSpan = document.createElement('div');
+                    detailSpan.className = 'text-xs text-gray-500 mt-1 italic pl-1';
+                    detailSpan.textContent = evt.detail;
+                    textContainer.appendChild(detailSpan);
+                }
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'flex items-center';
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full w-8 h-8 flex items-center justify-center transition text-sm mr-1';
+                editBtn.innerHTML = '✎';
+                editBtn.title = "Edit Event";
+                editBtn.onclick = () => {
+                    editingEventIndex = index;
+                    newEventTitleInput.value = evt.title;
+                    newEventDetailInput.value = evt.detail || '';
+                    newEventTypeSelect.value = evt.type;
+                    document.getElementById('addEventBtn').textContent = 'Update Event';
+                };
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full w-8 h-8 flex items-center justify-center transition text-xl';
+                delBtn.innerHTML = '&times;';
+                delBtn.title = "Delete Event";
+                delBtn.onclick = () => {
+                    eventMap[editingDate].splice(index, 1);
+                    if(eventMap[editingDate].length === 0) delete eventMap[editingDate];
+                    
+                    renderEditList();
+                    renderCalendar(currentYear, currentMonth); 
+                    if (!document.getElementById('halfTermModal').classList.contains('hidden')) openHalfTermModal();
+                    if (!document.getElementById('fullYearModal').classList.contains('hidden')) openFullYearModal();
+                };
+                
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(delBtn);
+
+                item.appendChild(textContainer);
+                item.appendChild(actionsDiv);
+                editDayEventsList.appendChild(item);
+            });
+        }
+
+        document.getElementById('closeEditModalBtn').addEventListener('click', () => {
+            editDayModal.classList.add('hidden');
+        });
+        
+        document.getElementById('addEventBtn').addEventListener('click', () => {
+            const title = newEventTitleInput.value.trim();
+            const detail = newEventDetailInput.value.trim();
+            if (!title) return;
+            
+            if (!eventMap[editingDate]) {
+                eventMap[editingDate] = [];
+            }
+            
+            if (editingEventIndex > -1) {
+                eventMap[editingDate][editingEventIndex] = {
+                    start: editingDate,
+                    end: editingDate,
+                    title: title,
+                    detail: detail,
+                    type: newEventTypeSelect.value
+                };
+                editingEventIndex = -1;
+                document.getElementById('addEventBtn').textContent = 'Add to Calendar';
+            } else {
+                eventMap[editingDate].push({
+                    start: editingDate,
+                    end: editingDate,
+                    title: title,
+                    detail: detail,
+                    type: newEventTypeSelect.value
+                });
+            }
+            
+            newEventTitleInput.value = '';
+            newEventDetailInput.value = '';
+            renderEditList();
+            renderCalendar(currentYear, currentMonth); 
+            
+            if (!document.getElementById('halfTermModal').classList.contains('hidden')) openHalfTermModal();
+            if (!document.getElementById('fullYearModal').classList.contains('hidden')) openFullYearModal();
+        });
+
+    </script>
+</body>
+</html>
