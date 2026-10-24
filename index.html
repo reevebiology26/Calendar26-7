@@ -86,7 +86,7 @@
             }
         }
         
-        /* Advanced Print Handling */
+        /* Advanced Print Handling optimized for multi-page output and clear formatting */
         @media print {
             body { 
                 background: white !important; 
@@ -98,9 +98,7 @@
             .no-print { display: none !important; }
             .print-only { display: block !important; }
             
-            /* Print mode modifiers set via JS */
             body.print-main #halfTermModal, body.print-main #fullYearModal { display: none !important; }
-            
             body.print-modal > div:first-of-type { display: none !important; }
             
             body.print-modal .modal-container { 
@@ -115,9 +113,27 @@
                 max-height: none; 
                 border: none;
             }
+
+            /* Full Year & Half Term multi-page printing rules */
+            #fullYearModal {
+                position: static !important;
+                display: block !important;
+                background: white !important;
+            }
+            #fullYearModal .modal-content {
+                box-shadow: none !important;
+                max-height: none !important;
+                overflow: visible !important;
+                width: 100% !important;
+            }
+            #fullYearContent > div {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-bottom: 2rem;
+            }
             
-            .day-cell { height: auto !important; min-height: 80px; overflow: hidden; page-break-inside: avoid; }
-            .header-gradient, .modal-gradient { background: white !important; color: black !important; border-bottom: 2px solid black; }
+            .day-cell { height: 95px !important; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
+            .header-gradient, .modal-gradient { background: #1e3a8a !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
         
         /* Page Turning Animations (Subtle Slide & Fade) */
@@ -143,10 +159,10 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* Very slow, subtle red pulse animation for active To-Do items */
+        /* Slow, subtle red pulse animation for active To-Do items */
         @keyframes subtleRedPulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.02); background-color: #dc2626; }
+            0%, 100% { opacity: 1; transform: scale(1); background-color: #dc2626; }
+            50% { opacity: 0.8; transform: scale(1.02); background-color: #991b1b; }
         }
         .todo-flash {
             animation: subtleRedPulse 3s infinite ease-in-out;
@@ -169,8 +185,8 @@
                 <h1 class="text-xl md:text-2xl font-bold tracking-tight shadow-sm">School Calendar</h1>
                 <p class="text-xs text-blue-200 font-medium tracking-wide mb-1">Made by Mr A Reeve</p>
                 <div class="flex items-center justify-center md:justify-start space-x-2">
-                    <span class="bg-orange-500 px-2 py-0.5 rounded text-[0.65rem] font-bold text-white shadow-md border border-orange-400"><span id="gcseCountdown"></span> to GCSEs</span>
-                    <span class="bg-orange-500 px-2 py-0.5 rounded text-[0.65rem] font-bold text-white shadow-md border border-orange-400"><span id="alevelCountdown"></span> to A-Levels</span>
+                    <span class="bg-orange-600 px-2 py-0.5 rounded text-[0.65rem] font-bold text-white shadow-md border border-orange-500"><span id="gcseCountdown"></span> to GCSEs</span>
+                    <span class="bg-orange-600 px-2 py-0.5 rounded text-[0.65rem] font-bold text-white shadow-md border border-orange-500"><span id="alevelCountdown"></span> to A-Levels</span>
                 </div>
             </div>
             
@@ -534,14 +550,38 @@
             return false;
         }
 
-        // To-Do List State & Carry Over Management
-        let todoItems = [];
-        let previousMonthIncompleteTasks = [];
+        // Independent Monthly To-Do State Management
+        const monthlyTodos = {}; // Format: 'YYYY-MM': [{ text: '...', completed: false }]
+
+        function getMonthKey(year, month) {
+            return `${year}-${String(month + 1).padStart(2, '0')}`;
+        }
+
+        function getCurrentMonthTodos() {
+            const key = getMonthKey(currentYear, currentMonth);
+            if (!monthlyTodos[key]) {
+                monthlyTodos[key] = [];
+            }
+            return monthlyTodos[key];
+        }
+
+        function getPreviousMonthTodos() {
+            let prevMonth = currentMonth - 1;
+            let prevYear = currentYear;
+            if (prevMonth < 0) {
+                prevMonth = 11;
+                prevYear--;
+            }
+            if (prevYear < startYear) return [];
+            const key = getMonthKey(prevYear, prevMonth);
+            return monthlyTodos[key] || [];
+        }
 
         function updateTodoUI() {
             const btn = document.getElementById('todoBtn');
             const badge = document.getElementById('todoBadge');
-            const activeCount = todoItems.filter(t => !t.completed).length;
+            const todos = getCurrentMonthTodos();
+            const activeCount = todos.filter(t => !t.completed).length;
 
             if (activeCount > 0) {
                 btn.classList.add('todo-flash');
@@ -555,7 +595,10 @@
 
         function checkCarryOverTasks() {
             const promptBox = document.getElementById('carryOverPrompt');
-            if (previousMonthIncompleteTasks.length > 0) {
+            const prevTodos = getPreviousMonthTodos();
+            const uncompletedPrev = prevTodos.filter(t => !t.completed);
+            
+            if (uncompletedPrev.length > 0) {
                 promptBox.classList.remove('hidden');
             } else {
                 promptBox.classList.add('hidden');
@@ -565,11 +608,12 @@
         function renderTodoList() {
             const container = document.getElementById('todoListArea');
             container.innerHTML = '';
+            const todos = getCurrentMonthTodos();
 
-            if (todoItems.length === 0) {
-                container.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4">No tasks added yet.</p>';
+            if (todos.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4">No tasks added yet for this month.</p>';
             } else {
-                todoItems.forEach((task, index) => {
+                todos.forEach((task, index) => {
                     const item = document.createElement('div');
                     item.className = 'flex justify-between items-center bg-white p-2.5 border border-gray-200 rounded-lg mb-2 shadow-sm';
 
@@ -597,7 +641,7 @@
                     delBtn.className = 'text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full w-7 h-7 flex items-center justify-center transition text-lg';
                     delBtn.innerHTML = '&times;';
                     delBtn.onclick = () => {
-                        todoItems.splice(index, 1);
+                        todos.splice(index, 1);
                         updateTodoUI();
                         renderTodoList();
                     };
@@ -626,9 +670,9 @@
                 const isBankHoliday = bankHolidays.includes(dateString);
                 const isHoliday = isSchoolHoliday(dateString);
 
-                // Skip standard events on weekends/holidays unless allowed types. Mondays can have events now.
-                if ((isWeekend || isBankHoliday || isHoliday) && !['itfc', 'trip', 'term', 'important-exam', 'exam'].includes(evt.type)) {
-                    // Skip
+                // Skip standard events on weekends/holidays/mondays unless allowed types
+                if ((isWeekend || isBankHoliday || isHoliday || isMonday) && !['itfc', 'trip', 'term', 'important-exam', 'exam'].includes(evt.type)) {
+                    // Skip standard events on rest days
                 } else {
                     if(!eventMap[dateString]) {
                         eventMap[dateString] = [];
@@ -741,18 +785,16 @@
                 cell.addEventListener('click', () => openEditModal(dateString));
                 calendarGrid.appendChild(cell);
             }
+            updateTodoUI();
         }
 
-        // Transition with Month change & Task rollover caching
+        // Transition with Month change
         let isAnimating = false;
 
         function transitionMonth(direction) {
             if (isAnimating) return;
             if (direction === 'prev' && prevBtn.disabled) return;
             if (direction === 'next' && nextBtn.disabled) return;
-
-            // Cache incomplete tasks as previous month rollover (without auto-prepopulating)
-            previousMonthIncompleteTasks = todoItems.filter(t => !t.completed).map(t => t.text);
 
             isAnimating = true;
             const grid = document.getElementById('calendarGrid');
@@ -834,7 +876,7 @@
             const endDt = new Date(endStr);
             
             const gridContainer = document.createElement('div');
-            gridContainer.className = "flex-1 flex flex-col bg-white rounded border border-gray-200";
+            gridContainer.className = "flex-1 flex flex-col bg-white rounded border border-gray-200 mb-4 print:mb-6";
             
             if (!hideTitle) {
                 const titleBar = document.createElement('div');
@@ -940,7 +982,7 @@
             
             halfTerms.forEach(ht => {
                 const wrapper = document.createElement('div');
-                wrapper.className = "mb-4";
+                wrapper.className = "mb-6 print:mb-8";
                 
                 const title = document.createElement('h4');
                 title.className = "text-lg font-bold text-gray-800 mb-2 pl-1 border-l-4 border-indigo-500";
@@ -954,30 +996,24 @@
             document.getElementById('fullYearModal').classList.remove('hidden');
         }
 
-        // Print handlers
-        document.getElementById('printMainBtn').addEventListener('click', () => {
-            document.body.classList.add('print-main');
-            window.print();
-            document.body.classList.remove('print-main');
-        });
-        
-        document.getElementById('printHalfTermBtn').addEventListener('click', () => {
-            document.body.classList.add('print-modal');
-            window.print();
-            document.body.classList.remove('print-modal');
-        });
+        // Print handlers with reliable multi-page mobile/iPad & PC support
+        function triggerPrint(modeClass) {
+            document.body.classList.add(modeClass);
+            setTimeout(() => {
+                window.print();
+                document.body.classList.remove(modeClass);
+            }, 200);
+        }
 
-        document.getElementById('printFullYearBtn').addEventListener('click', () => {
-            document.body.classList.add('print-modal');
-            window.print();
-            document.body.classList.remove('print-modal');
-        });
+        document.getElementById('printMainBtn').addEventListener('click', () => triggerPrint('print-main'));
+        document.getElementById('printHalfTermBtn').addEventListener('click', () => triggerPrint('print-modal'));
+        document.getElementById('printFullYearBtn').addEventListener('click', () => triggerPrint('print-modal'));
 
         // Save & Load
         document.getElementById('saveBtn').addEventListener('click', () => {
             const saveData = {
                 events: eventMap,
-                todos: todoItems
+                todos: monthlyTodos
             };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(saveData));
             const dlNode = document.createElement('a');
@@ -1003,14 +1039,15 @@
                     if (parsed.events) {
                         Object.keys(eventMap).forEach(k => delete eventMap[k]);
                         Object.assign(eventMap, parsed.events);
-                        todoItems = parsed.todos || [];
+                        
+                        Object.keys(monthlyTodos).forEach(k => delete monthlyTodos[k]);
+                        Object.assign(monthlyTodos, parsed.todos || {});
                     } else {
                         Object.keys(eventMap).forEach(k => delete eventMap[k]);
                         Object.assign(eventMap, parsed);
                     }
                     
                     renderCalendar(currentYear, currentMonth);
-                    updateTodoUI();
                     if (!document.getElementById('halfTermModal').classList.contains('hidden')) openHalfTermModal();
                     if (!document.getElementById('fullYearModal').classList.contains('hidden')) openFullYearModal();
                     
@@ -1035,18 +1072,20 @@
             const input = document.getElementById('newTaskInput');
             const val = input.value.trim();
             if(!val) return;
-            todoItems.push({ text: val, completed: false });
+            const todos = getCurrentMonthTodos();
+            todos.push({ text: val, completed: false });
             input.value = '';
             updateTodoUI();
             renderTodoList();
         });
         document.getElementById('carryOverBtn').addEventListener('click', () => {
-            previousMonthIncompleteTasks.forEach(taskText => {
-                if(!todoItems.some(t => t.text === taskText)) {
-                    todoItems.push({ text: taskText, completed: false });
+            const todos = getCurrentMonthTodos();
+            const prevTodos = getPreviousMonthTodos();
+            prevTodos.forEach(task => {
+                if(!todos.some(t => t.text === task.text)) {
+                    todos.push({ text: task.text, completed: false });
                 }
             });
-            previousMonthIncompleteTasks = [];
             updateTodoUI();
             renderTodoList();
             showToast("Uncompleted tasks imported!");
@@ -1204,4 +1243,5 @@
         });
 
     </script>
-</body
+</body>
+</html>
